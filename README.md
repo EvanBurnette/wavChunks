@@ -1,6 +1,8 @@
 # wavChunks
 
-Sample splitting proof of concept running completely in the browser
+## What is this?
+
+It is a sample splitting proof of concept running completely in the browser
 
 ## Motivation
 
@@ -19,7 +21,11 @@ Upload a wavefile of samples you've recorded and it will generate audio clips at
 
 ### Notes on this development
 
-Fixing samplekiller.com for public use took two weeks of intense work and long days. I had to go much broader and much deeper than I expected. I learned the Web Audio API and all about webworkers. I committed myself to typescript and jsdoc. I discovered new resources outside of MDN. Especially the WHATWG spec and google's technical blogs. I reached out to another developer working on similar ideas and I read his source code. I also attempted to read chromium source code. Ultimately looking at my data helped me break through blockages to achieve the goal.
+Fixing samplekiller.com for public use took two weeks of intense work and long days. I had to go much broader and much deeper than I expected.
+
+I learned the Web Audio API and all about webworkers. I committed myself to typescript and jsdoc. I discovered new resources outside of MDN. Especially the WHATWG spec and google's technical blogs. I reached out to another developer working on similar ideas and I read his source code. I also attempted to read chromium source code.
+
+Looking at my data and reading documentation helped me break through blockages to achieve the goal.
 
 ### Things I want to try next
 
