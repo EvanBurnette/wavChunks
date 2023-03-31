@@ -60,6 +60,8 @@ fileInput?.addEventListener("change", async (event: Event) => {
 
   waveFile = new WaveFile(buffer);
   waveBuffer = waveFile.getSamples(false, Float32Array);
+  // update samplerate of worker script
+  detectWorker.postMessage({ params: { sampleRate: waveFile.fmt.sampleRate } });
   // @ts-ignore
   const header = buffer.slice(0, waveFile.head + 8);
 
