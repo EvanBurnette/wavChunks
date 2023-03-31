@@ -20,12 +20,13 @@ const addSound = (sound: HTMLMediaElement["src"], soundIdx: number) => {
   soundList.appendChild(li);
 };
 let waveFile: WaveFile;
+let waveBuffer: ArrayLike<number>;
 const detectWorker = new DetectWorker();
 detectWorker.onmessage = (
   // @ts-ignore
   event
 ) => {
-  const soundBuffer: Float64Array = waveFile.data.samples;
+  const soundBuffer: ArrayLike<number> = waveFile.data.samples;
   const numChannels: number = waveFile.fmt.numChannels;
   const sampleRate: number = waveFile.fmt.sampleRate;
   const bitDepth: string = waveFile.bitDepth;
@@ -42,9 +43,9 @@ detectWorker.onmessage = (
     numChannels,
     sampleRate,
     bitDepth,
+    waveBuffer.slice(onset, offset)
     //TODO: replace this slow conversion to float64buffer with just slicing the raw buffer
     //TODO: use the same header trick from before because all this converting stuff is super slow when working with 24bit audio
-    waveFile.getSamples(false, Int32Array).slice(onset, offset)
     // waveFile.data.samples.slice(onset, offset)
   );
   addSound(sound.toDataURI(), clipIdx);
@@ -58,6 +59,7 @@ fileInput?.addEventListener("change", async (event: Event) => {
   const buffer = new Uint8Array(await file.arrayBuffer());
 
   waveFile = new WaveFile(buffer);
+  waveBuffer = waveFile.getSamples(false, Float32Array);
   // @ts-ignore
   const header = buffer.slice(0, waveFile.head + 8);
 
