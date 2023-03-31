@@ -34,3 +34,13 @@ Looking at my data and reading documentation helped me break through blockages t
 - Audio Context playback with MediaElementAudioSourceNode
 
   - This could allow me to replace a lot of jank on samplekiller.com, especially the preloading of audio src as the user browses samples and I suspect and hope it might perform better and use less memory
+
+- Normalize audio
+
+  - We can capture the peak volume of each sound then multiply the whole clip by .95/peak
+
+- Eliminate tiny samples smaller than 10ms
+
+- Generate spectograms and/or waveforms
+  - possibly use these to automatically classify with a small deep learning model
+  - it would be nice if we could create a model that determines aesthetics or encourages variation
