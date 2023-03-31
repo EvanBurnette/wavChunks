@@ -45,11 +45,13 @@ Looking at my data and reading documentation helped me break through blockages t
 
 - Eliminate tiny samples smaller than 10ms
 
+- Fade out end of audio samples
+
 - Generate spectograms and/or waveforms
-  - possibly use these to automatically classify with a small deep learning model
-  - it would be nice if we could create a model that determines aesthetics or encourages variation
+  - use these to automatically classify with a small deep learning model
+  - it would be nice if we could create a model that determines aesthetic quality and encourages variation in sample packs
 
 ## Things I want to try for the next project
 
 - Use whisper AI to rename clips or create clip cues for use with something like [losslesscut](https://github.com/mifi/lossless-cut)
-- Detect and remove ums and non speech noises via my other killer app [fillerkiller](https://github.com/evanburnette/fillerkiller)
+- Detect and remove "ums" and non speech noises via my other killer app [fillerkiller](https://github.com/evanburnette/fillerkiller)
