@@ -31,17 +31,18 @@ Looking at my data and reading documentation helped me break through blockages t
 
 - Automatic testing with selenium or similar
 
-- Audio Context playback with MediaElementAudioSourceNode
+- Audio Context playback with MediaElementAudioSourceNode (or similar)
 
   - This could allow me to replace a lot of jank on samplekiller.com, especially the preloading of audio src as the user browses samples and I suspect and hope it might perform better and use less memory
   - The current version of wavChunks chokes on a ~300MB / 17 minute 24-bit wav file while using waveFile.getSamples(). The wavefile.js library is somehow copying it 10X+ in browser memory and eventually crashes the browser tab. 👎
+    - This was actually caused by de-interleaving and reinterleaving stereo recordings
 
 - Normalize audio
 
   - We can capture the peak volume of each sound then multiply the whole clip by .95/peak
   - If we switch to audio context playback this will be a k-rate gain node that we set at the beginning of each sample
   - Maybe a better way would just be to normalize the audio in place
-  - When we export, we will have to
+  - When we export, we will have to process it anyway so we can just do it ahead of time with offlineAudioContext
 
 - Eliminate tiny samples smaller than 10ms
 
