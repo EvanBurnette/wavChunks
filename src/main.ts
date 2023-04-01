@@ -5,6 +5,10 @@ import DetectWorker from "./detectWorker.js?worker";
 const fileInput = document.querySelector("#fileInput");
 const soundList = document.querySelector("#sounds");
 
+var encode = (bytes) => {
+  return btoa(bytes);
+};
+
 const addSound = (sound: HTMLMediaElement["src"], soundIdx: number) => {
   // console.log("sound", sound);
   const audio = document.createElement("audio");
@@ -16,23 +20,25 @@ const addSound = (sound: HTMLMediaElement["src"], soundIdx: number) => {
   const li = document.createElement("li");
   li.innerText = String(soundIdx);
   li.appendChild(audio);
-
+  //@ts-ignore
   soundList.appendChild(li);
 };
 let waveFile: WaveFile;
-let waveBuffer: ArrayLike<number>;
+let waveBuffer: Float32Array;
 const detectWorker = new DetectWorker();
 detectWorker.onmessage = (
   // @ts-ignore
   event
 ) => {
-  const soundBuffer: ArrayLike<number> = waveFile.data.samples;
+  // const soundBuffer: ArrayLike<number> = waveFile.data.samples;
+  // @ts-ignore
   const numChannels: number = waveFile.fmt.numChannels;
+  // @ts-ignore
   const sampleRate: number = waveFile.fmt.sampleRate;
   const bitDepth: string = waveFile.bitDepth;
-  const bits: number = waveFile.dataType.bits;
-  const bytesPerSample = bits / 8;
-  const byteRate = waveFile.fmt.byteRate;
+  // const bits: number = waveFile.dataType.bits;
+  // const bytesPerSample = bits / 8;
+  // const byteRate = waveFile.fmt.byteRate;
   const clipIdx = event.data.clipIdx;
   const onset = clipIdx * sampleRate + event.data.onset;
   const offset = clipIdx * sampleRate + event.data.offset;
@@ -55,11 +61,12 @@ detectWorker.onmessage = (
 fileInput?.addEventListener("change", async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file: File = (target.files as FileList)[0];
-
+  console.log(file);
+  console.log("file.type", file.type);
   const buffer = new Uint8Array(await file.arrayBuffer());
 
   waveFile = new WaveFile(buffer);
-  waveBuffer = waveFile.getSamples(false, Float32Array);
+  waveBuffer = waveFile.getSamples(true, Int32Array);
   // update samplerate of worker script
   detectWorker.postMessage({ params: { sampleRate: waveFile.fmt.sampleRate } });
   // @ts-ignore
