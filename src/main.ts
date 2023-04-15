@@ -4,17 +4,14 @@ import DetectWorker from "./detectWorker.js?worker";
 
 const fileInput = document.querySelector("#fileInput");
 const soundList = document.querySelector("#sounds");
-
-var encode = (bytes) => {
-  return btoa(bytes);
-};
+let buffer;
 
 const addSound = (sound: HTMLMediaElement["src"], soundIdx: number) => {
   // console.log("sound", sound);
   const audio = document.createElement("audio");
   audio.src = sound;
   audio.controls = true;
-  audio.onended = (event) => {
+  audio.onended = (_) => {
     audio.src = sound;
   };
   const li = document.createElement("li");
@@ -24,49 +21,57 @@ const addSound = (sound: HTMLMediaElement["src"], soundIdx: number) => {
   soundList.appendChild(li);
 };
 let waveFile: WaveFile;
-let waveBuffer: Float32Array;
+let waveBuffer: Uint8Array;
 const detectWorker = new DetectWorker();
 detectWorker.onmessage = (
   // @ts-ignore
   event
 ) => {
-  // const soundBuffer: ArrayLike<number> = waveFile.data.samples;
+  // clip the sample out
+  // TODO: normalize samples
   // @ts-ignore
   const numChannels: number = waveFile.fmt.numChannels;
   // @ts-ignore
   const sampleRate: number = waveFile.fmt.sampleRate;
-  const bitDepth: string = waveFile.bitDepth;
-  // const bits: number = waveFile.dataType.bits;
-  // const bytesPerSample = bits / 8;
-  // const byteRate = waveFile.fmt.byteRate;
+  // const bitDepth: string = waveFile.bitDepth;
   const clipIdx = event.data.clipIdx;
-  const onset = clipIdx * sampleRate + event.data.onset;
-  const offset = clipIdx * sampleRate + event.data.offset;
-  // const onset = clipIdx * byteRate + event.data.onset;
-  // const offset = clipIdx * byteRate + event.data.offset;
-  const sound = new WaveFile();
-  sound.fromScratch(
-    numChannels,
-    sampleRate,
-    bitDepth,
-    waveBuffer.slice(onset, offset)
-    //TODO: replace this slow conversion to float64buffer with just slicing the raw buffer
-    //TODO: use the same header trick from before because all this converting stuff is super slow when working with 24bit audio
-    // waveFile.data.samples.slice(onset, offset)
-  );
-  addSound(sound.toDataURI(), clipIdx);
+
+  // @ts-ignore
+  const bytesPerSampleFrame = numChannels * (waveFile.fmt.bitsPerSample / 8);
+  const onset = (clipIdx * sampleRate + event.data.onset) * bytesPerSampleFrame;
+  const offset =
+    (clipIdx * sampleRate + event.data.offset) * bytesPerSampleFrame;
+
+  // const sound = new WaveFile();
+  // @ts-ignore
+  // const bytesPerSampleFrame = (numChannels * waveFile.fmt.bitsPerSample) / 8;
+  // @ts-ignore
+  // const header = waveBuffer.slice(0, waveFile.head + 8);
+  const soundBuffer = waveBuffer.slice(onset, offset);
+  // console.log(soundBuffer);
+  // @ts-ignore
+  // sound.fromScratch(numChannels, sampleRate, bitDepth, soundBuffer);
+  const sound = makeSample(buffer.slice(0, waveFile.head + 8), soundBuffer);
+  // console.log("sound to buffer", sound.toBuffer());
+  const soundWave = new WaveFile();
+  soundWave.fromBuffer(sound);
+  addSound(soundWave.toDataURI(), clipIdx);
 };
 
-// when file is loaded confirm in console
 fileInput?.addEventListener("change", async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file: File = (target.files as FileList)[0];
   console.log(file);
   console.log("file.type", file.type);
-  const buffer = new Uint8Array(await file.arrayBuffer());
+  buffer = new Uint8Array(await file.arrayBuffer());
+  console.log("buffer", buffer);
 
   waveFile = new WaveFile(buffer);
-  waveBuffer = waveFile.getSamples(true, Int32Array);
+  // @ts-ignore
+  // waveBuffer = waveFile.getSamples(true, Float32Array);
+  waveBuffer = waveFile.data.samples;
+
+  // @ts-ignore
   // update samplerate of worker script
   detectWorker.postMessage({ params: { sampleRate: waveFile.fmt.sampleRate } });
   // @ts-ignore
@@ -76,15 +81,28 @@ fileInput?.addEventListener("change", async (event: Event) => {
   const totalBytes = waveFile.chunkSize;
   // @ts-ignore
   const byteRate = waveFile.fmt.byteRate;
-
-  const newHeader = structuredClone(header);
+  // console.log(
+  //   "og header data size",
+  //   // new DataView(header.buffer).getBigInt64(4),
+  //   new DataView(header.buffer).getUint32(header.length - 4, true)
+  // );
+  const newHeader = header.slice();
   // @ts-ignore
-  new DataView(newHeader.buffer).setUint32(4, waveFile.head + byteRate);
-  new DataView(newHeader.buffer).setUint32(4, byteRate);
+  // create 1 second clip header
+  new DataView(newHeader.buffer).setUint32(4, waveFile.head + byteRate, true);
+  // @ts-ignore
+  new DataView(newHeader.buffer).setUint32(waveFile.head + 4, byteRate, true);
 
-  console.log("header", new DataView(header.buffer).getUint32(4));
-  console.log("newHeader", new DataView(newHeader.buffer).getUint32(4));
+  // console.log(
+  //   "header data size",
+  //   new DataView(header.buffer).getUint32(header.length - 4, true)
+  // );
+  // console.log(
+  //   "newHeader data size",
+  //   new DataView(newHeader.buffer).getUint32(header.length - 4, true)
+  // );
 
+  // setting this to the clip length is probably unnecessary because we're just using decodeAudioData
   const offlineContext = new OfflineAudioContext(
     // @ts-ignore
     waveFile.fmt.numChannels,
@@ -127,4 +145,30 @@ const clipGenerator = function* (
   }
   const end = Date.now();
   return { time: end - start };
+};
+
+const makeSample = (header: Uint8Array, buffer: Uint8Array) => {
+  const newHeader = amendHeader(header, buffer.length);
+  const newSample = new Uint8Array(header.length + buffer.length);
+  newSample.set(newHeader, 0);
+  newSample.set(buffer, newHeader.length);
+  return newSample;
+};
+
+const amendHeader = (header: Uint8Array, dataSize: number) => {
+  const newHeader = header.slice();
+  // set filesize
+  new DataView(newHeader.buffer).setUint32(
+    4,
+    dataSize + newHeader.length - 4,
+    true
+  );
+  // set datachunk size
+  new DataView(newHeader.buffer).setUint32(
+    newHeader.length - 4,
+    dataSize,
+    true
+  );
+  console.log(header, newHeader);
+  return newHeader;
 };

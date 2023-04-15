@@ -43,5 +43,3 @@ onmessage = (event) => {
     }
   }
 };
-
-postMessage("detect worker online");
