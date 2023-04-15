@@ -19,11 +19,15 @@ This is an experimental piece of a larger project [samplekiller.com](https://sam
 
 Upload a wavefile of samples you've recorded and it will generate audio clips at onsets
 
+## Web workers
+
+The detection algorithm runs in a webworker named 'detectWorker.js'. This is just a single web worker and it's my first time using them. Here is a proposed system diagram for this module as it will need to be implemented for the main samplekiller app. ![system diagram for sound splitting module](./public/sampleSplittingModule.svg)
+
 ### Notes on this development
 
 Fixing samplekiller.com for public use took two weeks of intense work and long days. I had to go much broader and much deeper than I expected.
 
-I learned the Web Audio API and all about webworkers. I committed myself to typescript and jsdoc. I discovered new resources outside of MDN. Especially the WHATWG spec and google's technical blogs. I reached out to another developer working on similar ideas and I read his source code. I also attempted to read chromium source code.
+I learned the Web Audio API and all about webworkers. I committed myself to typescript and/or jsdoc. I discovered new resources outside of MDN. Especially the WHATWG spec and google's technical blogs. I reached out to another developer working on similar ideas and I read his source code. I also attempted to read chromium source code.
 
 Looking at my data and reading documentation helped me break through blockages to achieve the goal.
 
