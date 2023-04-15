@@ -17,7 +17,7 @@ This is an experimental piece of a larger project [samplekiller.com](https://sam
 
 ## Usage
 
-Upload a wavefile of samples you've recorded and it will generate audio clips at onsets
+Upload a wavefile of samples you've recorded or the demo.wav included in /public and this program will generate audio clips at onsets if there is enough silence between samples.
 
 ## Web workers
 
