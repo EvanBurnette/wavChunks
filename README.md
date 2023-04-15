@@ -21,7 +21,7 @@ Upload a wavefile of samples you've recorded and it will generate audio clips at
 
 ## Web workers
 
-The detection algorithm runs in a webworker named 'detectWorker.js'. This is just a single web worker and it's my first time using them. Here is a proposed system diagram for this module as it will need to be implemented for the main samplekiller app. ![system diagram for sound splitting module](./public/sampleSplittingModule.svg)
+The detection algorithm runs in a webworker named 'detectWorker.js'. This is just a single web worker and it's my first time using them. Here is a proposed system diagram for this module as it might need to be implemented for the main samplekiller app, with even more work being done off the main thread. ![system diagram for sound splitting module](./public/sampleSplittingModule.svg)
 
 ### Notes on this development
 
