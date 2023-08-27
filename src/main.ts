@@ -1,13 +1,14 @@
 import "./style.css";
 import { WaveFile } from "wavefile";
 import DetectWorker from "./detectWorker.js?worker";
+import {zip} from 'lodash';
 
 const fileInput = document.querySelector("#fileInput");
 const soundList = document.querySelector("#sounds");
-let buffer;
+let buffer:Uint8Array | undefined = undefined;
+let soundsCreated = 0;
 
 const addSound = (sound: HTMLMediaElement["src"], soundIdx: number) => {
-  // console.log("sound", sound);
   const audio = document.createElement("audio");
   audio.src = sound;
   audio.controls = true;
@@ -17,54 +18,59 @@ const addSound = (sound: HTMLMediaElement["src"], soundIdx: number) => {
   const li = document.createElement("li");
   li.innerText = String(soundIdx);
   li.appendChild(audio);
-  //@ts-ignore
+  // @ts-ignore
   soundList.appendChild(li);
+
+  // process into spectrogram image
+  if (audio.duration > 2) {
+    return;
+  }
+
 };
 let waveFile: WaveFile;
 let waveBuffer: Uint8Array;
 const detectWorker = new DetectWorker();
-detectWorker.onmessage = (
+detectWorker.onmessage = async (
   // @ts-ignore
   event
 ) => {
   // clip the sample out
-  // TODO: normalize samples
   // @ts-ignore
   const numChannels: number = waveFile.fmt.numChannels;
   // @ts-ignore
   const sampleRate: number = waveFile.fmt.sampleRate;
-  // const bitDepth: string = waveFile.bitDepth;
+
   const clipIdx = event.data.clipIdx;
+  const clipPeakVolume = event.data.peakVolume;
+  console.log(`clip ${clipIdx} peak volume is ${clipPeakVolume}`)
+  // if (clipPeakVolume < 0.001) return;
 
   // @ts-ignore
   const bytesPerSampleFrame = numChannels * (waveFile.fmt.bitsPerSample / 8);
-  const onset = (clipIdx * sampleRate + event.data.onset) * bytesPerSampleFrame;
-  const offset =
+  const onsetBytes = (clipIdx * sampleRate + event.data.onset) * bytesPerSampleFrame;
+  const offsetBytes =
     (clipIdx * sampleRate + event.data.offset) * bytesPerSampleFrame;
+  const sampleDuration = (offsetBytes - onsetBytes)/(bytesPerSampleFrame * sampleRate)
+  if (sampleDuration < 0.01 || sampleDuration > 2.0) return;
 
-  // const sound = new WaveFile();
-  // @ts-ignore
-  // const bytesPerSampleFrame = (numChannels * waveFile.fmt.bitsPerSample) / 8;
-  // @ts-ignore
-  // const header = waveBuffer.slice(0, waveFile.head + 8);
-  const soundBuffer = waveBuffer.slice(onset, offset);
-  // console.log(soundBuffer);
-  // @ts-ignore
-  // sound.fromScratch(numChannels, sampleRate, bitDepth, soundBuffer);
+  const soundBuffer = waveBuffer.slice(onsetBytes, offsetBytes);
+
   const sound = makeSample(buffer.slice(0, waveFile.head + 8), soundBuffer);
-  // console.log("sound to buffer", sound.toBuffer());
+
   const soundWave = new WaveFile();
   soundWave.fromBuffer(sound);
-  addSound(soundWave.toDataURI(), clipIdx);
+  // addSound(soundWave.toDataURI(), clipIdx);
+  if (soundWave)
+    addSound(createSoundBlob(await normalizeVolume(soundWave, clipPeakVolume)), soundsCreated++);
 };
 
 fileInput?.addEventListener("change", async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file: File = (target.files as FileList)[0];
-  console.log(file);
-  console.log("file.type", file.type);
+  // console.log(file);
+  // console.log("file.type", file.type);
   buffer = new Uint8Array(await file.arrayBuffer());
-  console.log("buffer", buffer);
+  // console.log("buffer", buffer);
 
   waveFile = new WaveFile(buffer);
   // @ts-ignore
@@ -77,15 +83,12 @@ fileInput?.addEventListener("change", async (event: Event) => {
   // @ts-ignore
   const header = buffer.slice(0, waveFile.head + 8);
 
-  console.log(waveFile);
   const totalBytes = waveFile.chunkSize;
   // @ts-ignore
   const byteRate = waveFile.fmt.byteRate;
-  // console.log(
-  //   "og header data size",
-  //   // new DataView(header.buffer).getBigInt64(4),
-  //   new DataView(header.buffer).getUint32(header.length - 4, true)
-  // );
+  console.log(waveFile)
+  console.log(`bit depth = ${8 * waveFile.fmt.byteRate / (waveFile.fmt.sampleRate * waveFile.fmt.numChannels)}`)
+
   const newHeader = header.slice();
   // @ts-ignore
   // create 1 second clip header
@@ -93,21 +96,12 @@ fileInput?.addEventListener("change", async (event: Event) => {
   // @ts-ignore
   new DataView(newHeader.buffer).setUint32(waveFile.head + 4, byteRate, true);
 
-  // console.log(
-  //   "header data size",
-  //   new DataView(header.buffer).getUint32(header.length - 4, true)
-  // );
-  // console.log(
-  //   "newHeader data size",
-  //   new DataView(newHeader.buffer).getUint32(header.length - 4, true)
-  // );
-
-  // setting this to the clip length is probably unnecessary because we're just using decodeAudioData
+  // setting this to the clip length is unnecessary because we're just using decodeAudioData
   const offlineContext = new OfflineAudioContext(
     // @ts-ignore
     waveFile.fmt.numChannels,
     // @ts-ignore
-    waveFile.data.chunkSize,
+    96000,
     // @ts-ignore
     waveFile.fmt.sampleRate
   );
@@ -169,6 +163,45 @@ const amendHeader = (header: Uint8Array, dataSize: number) => {
     dataSize,
     true
   );
-  console.log(header, newHeader);
+  // console.log(header, newHeader);
   return newHeader;
 };
+
+function createSoundBlob(wav: WaveFile) {
+  const blob = new Blob([wav.toBuffer()], { type: "audio/wav" });
+  return URL.createObjectURL(blob);
+}
+
+async function normalizeVolume(wav: WaveFile, peakVolume: number) {
+  const offlineCtx = new OfflineAudioContext(
+    // @ts-ignore
+  wav.fmt.numChannels,
+  // @ts-ignore
+  wav.data.chunkSize,
+  // @ts-ignore
+  wav.fmt.sampleRate)
+  const gainNode = offlineCtx.createGain();
+  console.log(peakVolume);
+  gainNode.gain.value = .95/peakVolume;
+  
+  try {
+    const audioBuffer = await offlineCtx.decodeAudioData(wav.toBuffer().buffer);
+  
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(gainNode);
+    gainNode.connect(offlineCtx.destination);
+  
+    source.start(0);
+  
+    const renderedBuffer = await offlineCtx.startRendering();
+
+    const newWav = new WaveFile();
+    // console.log(renderedBuffer)
+    newWav.fromScratch(wav.fmt.numChannels, wav.fmt.sampleRate, '32f', [renderedBuffer.getChannelData(0), renderedBuffer.getChannelData(1)]);
+    newWav.toBitDepth(wav.bitDepth);
+    return newWav;
+  } catch (error) {
+    console.error("An error occurred:", error);
+  }
+  }
